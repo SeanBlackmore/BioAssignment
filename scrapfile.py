@@ -6,6 +6,9 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import BaseCallback
 import numpy as np
+import torch as t
+
+from plot_results import plot_time_responses
 
 
 def train():
@@ -48,9 +51,9 @@ def train():
     env = Monitor(env)
 
     # Create and train the model
-    model = PPO("MlpPolicy", env, verbose=1)
+    model = DQN("MlpPolicy", env, verbose=1)
     model.learn(total_timesteps=2000000, callback=RewardCallback())
-    model.save("ppo_cartpole")
+    model.save("dqn_cartpole")
 
     # Delete and reload the model
     del model
@@ -58,24 +61,45 @@ def train():
 
 def sim():
     env = gym.make("DualCartPole-v4", render_mode="human")  # "human" for real-time visualization
-    model = PPO.load("ppo_cartpole")
+    model = DQN.load("Models/dqn_cartpole")
 
-    episodes = 0
-    while episodes < 5:
-        obs, _ = env.reset()
+    # episodes = 0
+    # while episodes < 10:
+    obs, _ = env.reset()
 
-        # Override internal state
-        env.unwrapped.state = [0.5, 0., 0., 0., 0., 0.]
+    # Initialize result arrays
+    timestep = 0.02
+    time = np.array([])
+    x = np.array([])
+    theta1 = np.array([])
+    theta2 = np.array([])
 
-        # Also update observation if needed
-        obs = env.unwrapped.state
+    # Override internal state
+    env.unwrapped.state = [1., 0., 0., 0., 0., 0.]
 
-        done = False
-        while not done:
-            action, _ = model.predict(obs)
-            obs, reward, terminated, truncated, _ = env.step(action)
-            done = terminated or truncated
-        episodes += 1
+    # Also update observation if needed
+    obs = env.unwrapped.state
+
+    done = False
+
+    step = 0
+    while step < 20:
+        action, _ = model.predict(obs)
+        obs, reward, terminated, truncated, _ = env.step(action)
+        done = terminated or truncated
+
+        # Append the results
+        time = np.append(time, step)
+        x = np.append(x, obs[0])
+        theta1 = np.append(theta1, obs[2])
+        theta2 = np.append(theta2, obs[4])
+
+        step += timestep
+
+        # episodes += 1
+
+    # Plot results
+    plot_time_responses(time, x, theta1, theta2)
 
     env.close()
 
